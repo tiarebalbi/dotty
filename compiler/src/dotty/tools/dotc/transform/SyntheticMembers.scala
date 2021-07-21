@@ -174,7 +174,8 @@ class SyntheticMembers(thisPhase: DenotTransformer) {
     def productElementBody(arity: Int, index: Tree)(using Context): Tree = {
       // case N => _${N + 1}
       val cases = 0.until(arity).map { i =>
-        CaseDef(Literal(Constant(i)), EmptyTree, Select(This(clazz), nme.selectorName(i)))
+        val sel = This(clazz).select(nme.selectorName(i), _.info.isParameterless)
+        CaseDef(Literal(Constant(i)), EmptyTree, sel)
       }
 
       Match(index, (cases :+ generateIOBECase(index)).toList)
@@ -551,7 +552,7 @@ class SyntheticMembers(thisPhase: DenotTransformer) {
     def addMethod(name: TermName, info: Type, cls: Symbol, body: (Symbol, Tree) => Context ?=> Tree): Unit = {
       val meth = newSymbol(clazz, name, Synthetic | Method, info, coord = clazz.coord)
       if (!existingDef(meth, clazz).exists) {
-        meth.entered
+        meth.enteredAfter(thisPhase)
         newBody = newBody :+
           synthesizeDef(meth, vrefss => body(cls, vrefss.head.head))
       }
@@ -564,7 +565,7 @@ class SyntheticMembers(thisPhase: DenotTransformer) {
         val monoType =
           newSymbol(clazz, tpnme.MirroredMonoType, Synthetic, TypeAlias(linked.reachableRawTypeRef), coord = clazz.coord)
         newBody = newBody :+ TypeDef(monoType).withSpan(ctx.owner.span.focus)
-        monoType.entered
+        monoType.enteredAfter(thisPhase)
       }
     }
     def makeSingletonMirror() =
